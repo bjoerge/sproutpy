@@ -152,9 +152,10 @@ def flatten(xxs: list):
 
 while True:
     vsys = get_vsys()
+    Pin(23, Pin.OUT).high()  # turn on WiFi module
 
     onboard_led = Pin("LED", Pin.OUT)
-    connect_blink(onboard_led, WIFI_SSID, WIFI_PASSWORD, WIFI_COUNTRY)
+    disconnect_wifi = connect_blink(onboard_led, WIFI_SSID, WIFI_PASSWORD, WIFI_COUNTRY)
 
     current_time = time.localtime()
 
@@ -166,12 +167,19 @@ while True:
         get_battery_sensor_mutations(vsys, current_time) if is_battery(vsys) else []
     )
 
-    submit_mutations(sensor_mutations + battery_status_mutations)
+    onboard_led.on()
+    submit_mutations(moisture_sensor_mutations + battery_status_mutations)
+    onboard_led.off()
 
-    # Needed before deepsleep to avoid crash
+    # disconnect WiFi
+    disconnect_wifi()
     time.sleep(1)
 
     if is_battery(vsys):
+        Pin("WL_GPIO1", Pin.OUT).low()  # smps low power mode
+        Pin(23, Pin.OUT).low()  # turn off WiFi module
+        time.sleep(1)
+
         # deepsleep if battery powered
         print(f"Deep sleep for {UPDATE_INTERVAL} seconds")
         deepsleep(UPDATE_INTERVAL * 1000)
@@ -179,4 +187,3 @@ while True:
         # likely USB powered, sleep normally
         print(f"Sleep for {UPDATE_INTERVAL} seconds")
         time.sleep_ms(UPDATE_INTERVAL * 1000)
-    print(f"Wake up!")

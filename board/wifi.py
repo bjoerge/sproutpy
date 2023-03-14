@@ -39,11 +39,17 @@ def connect(ssid: str, password: str, country: str):
     ntptime.settime()
     print(f"OK {time.localtime()}")
 
+    def disconnect():
+        wlan.disconnect()
+        wlan.active(False)
+
+    return disconnect
 
 def connect_blink(led, ssid: str, password: str, country: str):
     timer = Timer()
 
     timer.init(freq=8, mode=Timer.PERIODIC, callback=lambda x: led.toggle())
-    connect(ssid, password, country)
+    disconnect = connect(ssid, password, country)
     timer.deinit()
     led.off()
+    return disconnect

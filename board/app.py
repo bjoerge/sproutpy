@@ -1,9 +1,8 @@
 import os
 import time
 
-import ubinascii
 import urequests
-from machine import Pin, ADC, unique_id, deepsleep
+from machine import Pin, ADC, deepsleep
 from usanity import mutate_request
 from usanity.mutations import (
     create_if_not_exists,
@@ -14,6 +13,7 @@ from usanity.mutations import (
     insert,
 )
 
+from device_id import device_id
 from config import (
     SANITY_CONFIG,
     SENSORS,
@@ -29,8 +29,6 @@ from wifi import connect_blink
 # Device info
 [sysname, nodename, release, version, machine] = os.uname()
 
-# Get the device id
-device_id = ubinascii.hexlify(unique_id()).decode("utf-8")
 
 print(f"device id is {device_id}")
 
@@ -39,35 +37,31 @@ def is_battery(vsys):
     return vsys < 3.5
 
 
-def get_battery_sensor_mutations(power, current_time):
+def get_sensor_mutations(uuid: str, name: str, type: str, value, current_time):
     (year, month, day, hour, minute, second, wd, yd) = current_time
     timestamp = json_datetime(year, month, day, hour, minute, second)
 
-    sensor_uuid = f"sensor-{device_id}-battery"
-
-    device_name = f"{sysname} {nodename} {release} {version} {machine}"
-
     return [
-        create_if_not_exists({"_id": sensor_uuid, "_type": "sensor"}),
-        patch(sensor_uuid, patch_set("type", "battery")),
-        patch(sensor_uuid, patch_set("name", device_name)),
+        create_if_not_exists({"_id": uuid, "_type": "sensor"}),
+        patch(uuid, patch_set("type", type)),
+        patch(uuid, patch_set("name", name)),
         patch(
-            sensor_uuid,
-            patch_set("latest", {"timestamp": timestamp, "value": power / 3}),
+            uuid,
+            patch_set("latest", {"timestamp": timestamp, "value": value}),
         ),
-        patch(sensor_uuid, set_if_missing("measurements", [])),
-        patch(sensor_uuid, unset(f'measurements[_key=="{timestamp}"]')),
+        patch(uuid, set_if_missing("measurements", [])),
+        patch(uuid, unset(f'measurements[_key=="{timestamp}"]')),
         patch(
-            sensor_uuid,
+            uuid,
             insert(
                 "measurements",
                 "before",
                 0,
-                [{"_key": timestamp, "value": power, "timestamp": timestamp}],
+                [{"_key": timestamp, "value": value, "timestamp": timestamp}],
             ),
         ),
         # cap measurements at 200 entries
-        patch(sensor_uuid, unset("measurements[200:]")),
+        patch(uuid, unset("measurements[200:]")),
     ]
 
 
@@ -111,6 +105,31 @@ def get_sensor_mutations(measurement):
         # cap measurements at 200 entries
         patch(sensor_uuid, unset("measurements[200:]")),
     ]
+
+
+def get_battery_sensor_mutations(power, current_time):
+    device_name = f"{sysname} {nodename} {release} {version} {machine}"
+    return get_sensor_mutations(
+        uuid=f"sensor-{device_id}-battery",
+        name=device_name,
+        type="battery",
+        value=power,
+        current_time=current_time,
+    )
+
+
+def normalize_moisture_value(value: int, min: int, max: int):
+    return (value - min) / (max - min)
+
+
+def get_moisture_sensor_mutations(measurement):
+    return get_sensor_mutations(
+        uuid=f"sensor-{device_id}-{measurement['sensor_id']}",
+        name=measurement["sensor_id"],
+        type="moisture",
+        value=measurement["value"],
+        current_time=measurement["time"],
+    )
 
 
 def submit_mutations(mutations: list):
@@ -160,16 +179,19 @@ while True:
     current_time = time.localtime()
 
     measurements = read_measurements(SENSORS, current_time)
-    sensor_mutations = flatten(
-        [get_sensor_mutations(measurement) for measurement in measurements]
-    )
-    battery_status_mutations = (
-        get_battery_sensor_mutations(vsys, current_time) if is_battery(vsys) else []
+    moisture_sensor_mutations = flatten(
+        [get_moisture_sensor_mutations(measurement) for measurement in measurements]
     )
 
-    onboard_led.on()
-    submit_mutations(moisture_sensor_mutations + battery_status_mutations)
-    onboard_led.off()
+    battery_status_mutations = (
+        (get_battery_sensor_mutations(vsys, current_time)) if is_battery(vsys) else []
+    )
+
+    mutations = moisture_sensor_mutations + battery_status_mutations
+    if len(mutations) > 0:
+        onboard_led.on()
+        submit_mutations(mutations)
+        onboard_led.off()
 
     # disconnect WiFi
     disconnect_wifi()

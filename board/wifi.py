@@ -45,6 +45,7 @@ def connect(ssid: str, password: str, country: str):
 
     return disconnect
 
+
 def connect_blink(led, ssid: str, password: str, country: str):
     timer = Timer()
 

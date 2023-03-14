@@ -1,9 +1,12 @@
 import network
 from machine import Pin, ADC
 
+from config import MAX_ADC_VALUE
+
+conversion_factor = 3 * 3.3 / MAX_ADC_VALUE
+
 
 def get_vsys():
-    conversion_factor = 3 * 3.3 / 65535
     wlan = network.WLAN(network.STA_IF)
     wlan_active = wlan.active()
 

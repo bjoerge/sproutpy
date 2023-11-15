@@ -1,6 +1,6 @@
-# 🪴 Sprouty
+# 🪴 Sproutpy
 
-Use a Wi-Fi enabled Raspberry PI Pico W to measure the soil moisture in your potted plants and store the measurements
+Use a Wi-Fi enabled Raspberry PI Pico W and MicroPython to measure the soil moisture in your potted plants and store the measurements
 in the [Sanity](https://www.sanity.io/) Content Cloud.
 
 Read soil moisture levels for up to three capacitive moisture sensors at a configured interval and store these levels in

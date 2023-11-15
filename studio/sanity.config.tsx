@@ -7,7 +7,7 @@ import {Box} from '@sanity/ui'
 
 export default defineConfig({
   name: 'default',
-  title: '🪴 Sprouty Studio',
+  title: '🪴 Sproutpy Studio',
 
   projectId: readEnv(process.env, 'SANITY_STUDIO_PROJECT_ID'),
   dataset: readEnv(process.env, 'SANITY_STUDIO_DATASET'),
